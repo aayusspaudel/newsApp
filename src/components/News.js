@@ -31,24 +31,18 @@ const News = (props) => {
       props.setProgress(10);
       setLoading(true);
 
-      // Build URL - standard latest news query
       let url = `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
       
-      // Only attach category if it's not default/general
       if (props.category && props.category !== 'general') {
         url += `&category=${props.category}`;
       }
 
-      console.log("Fetching Initial:", url);
       props.setProgress(30);
 
       const response = await fetch(url);
       const parsedData = await response.json();
 
-      console.log("API Response Page 1:", parsedData);
-
       if (parsedData.status !== "ok" || !parsedData.news) {
-        console.error("API returned error or empty response:", parsedData);
         setArticles([]);
         setHasMore(false);
         setLoading(false);
@@ -59,7 +53,6 @@ const News = (props) => {
       setPage(pageNumber);
       setArticles(parsedData.news);
 
-      // If less items returned than requested page size, no more pages left
       if (parsedData.news.length < props.pageSize) {
         setHasMore(false);
       }
@@ -77,6 +70,9 @@ const News = (props) => {
   };
 
   const fetchMoreData = async () => {
+    // Don't trigger infinite fetch while main load is happening
+    if (loading) return;
+
     const nextPage = page + 1;
 
     let url = `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
@@ -85,16 +81,11 @@ const News = (props) => {
       url += `&category=${props.category}`;
     }
 
-    console.log("Fetching Page:", nextPage, url);
-
     try {
       const response = await fetch(url);
       const parsedData = await response.json();
 
-      console.log(`API Response Page ${nextPage}:`, parsedData);
-
       if (parsedData.status !== "ok" || !parsedData.news || parsedData.news.length === 0) {
-        console.warn("No more news available.");
         setHasMore(false);
         return;
       }
@@ -118,34 +109,37 @@ const News = (props) => {
         NewsMonkey - Top {capitalizeLetter(props.category)} Headlines
       </h1>
 
-      {loading && <Spinner />}
-
-      <InfiniteScroll
-        dataLength={articles.length}
-        next={fetchMoreData}
-        hasMore={hasMore}
-        loader={<Spinner />}
-      >
-        <div className="container">
-          <div className="row">
-            {articles
-              .filter(article => article && article.title)
-              .map((element, index) => (
-                <div className="col-md-4" key={`${element.id || element.url}-${index}`}>
-                  <NewsItem
-                    title={element.title ? element.title.slice(0, 45) : ""}
-                    description={element.description ? element.description.slice(0, 88) : ""}
-                    imageUrl={element.image}
-                    newsUrl={element.url}
-                    author={element.author || "Unknown"}
-                    date={element.published}
-                    source={element.category ? element.category.join(", ") : "News"}
-                  />
-                </div>
-              ))}
+      {/* Show single spinner during initial page load */}
+      {loading ? (
+        <Spinner />
+      ) : (
+        <InfiniteScroll
+          dataLength={articles.length}
+          next={fetchMoreData}
+          hasMore={hasMore}
+          loader={<Spinner />}
+        >
+          <div className="container">
+            <div className="row">
+              {articles
+                .filter(article => article && article.title)
+                .map((element, index) => (
+                  <div className="col-md-4" key={`${element.id || element.url}-${index}`}>
+                    <NewsItem
+                      title={element.title ? element.title.slice(0, 45) : ""}
+                      description={element.description ? element.description.slice(0, 88) : ""}
+                      imageUrl={element.image}
+                      newsUrl={element.url}
+                      author={element.author || "Unknown"}
+                      date={element.published}
+                      source={element.category ? element.category.join(", ") : "News"}
+                    />
+                  </div>
+                ))}
+            </div>
           </div>
-        </div>
-      </InfiniteScroll>
+        </InfiniteScroll>
+      )}
     </>
   );
 };
