@@ -8,7 +8,10 @@ const News = (props) => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalResults, setTotalResults] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Fallback API key in case props.apiKey is undefined
+  const apiKey = props.apiKey || "TDDGMkRXv8t88n4c0X3ZmQniDxqTiUouD_9eyd3D-ZvrbjCI";
 
   const capitalizeLetter = (string) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -17,6 +20,7 @@ const News = (props) => {
   useEffect(() => {
     document.title = `${capitalizeLetter(props.category)} - NewsMonkey`;
     setPage(1);
+    setHasMore(true);
     updateNews(1);
     // eslint-disable-next-line
   }, [props.category]);
@@ -26,36 +30,36 @@ const News = (props) => {
       props.setProgress(10);
       setLoading(true);
 
-      // Currents API endpoint syntax fix
-      const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${props.apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
-      console.log("Fetching URL:", url);
-
+      const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
+      
       props.setProgress(30);
 
       const response = await fetch(url);
       const parsedData = await response.json();
 
-      console.log("Parsed data:", parsedData);
-
-      if (parsedData.status !== "ok") {
-        console.error("Currents API error:", parsedData);
+      if (parsedData.status !== "ok" || !parsedData.news || parsedData.news.length === 0) {
         setArticles([]);
+        setHasMore(false);
         setLoading(false);
         props.setProgress(100);
         return;
       }
 
       setPage(pageNumber);
-      // Currents API returns array in 'news' field
-      setArticles(parsedData.news || []);
-      // Approximate total results based on items returned
-      setTotalResults(parsedData.news ? parsedData.news.length : 0);
+      setArticles(parsedData.news);
+      
+      // If we received fewer items than requested, there are no more pages
+      if (parsedData.news.length < props.pageSize) {
+        setHasMore(false);
+      }
+
       setLoading(false);
       props.setProgress(100);
 
     } catch (error) {
       console.error("Fetch error:", error);
       setArticles([]);
+      setHasMore(false);
       setLoading(false);
       props.setProgress(100);
     }
@@ -64,24 +68,27 @@ const News = (props) => {
   const fetchMoreData = async () => {
     const nextPage = page + 1;
 
-    const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${props.apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
+    const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
 
     try {
       const response = await fetch(url);
       const parsedData = await response.json();
 
-      if (parsedData.status !== "ok") {
-        console.error("Currents API fetchMore error:", parsedData);
+      if (parsedData.status !== "ok" || !parsedData.news || parsedData.news.length === 0) {
+        setHasMore(false);
         return;
       }
 
       setPage(nextPage);
-      setArticles(prevArticles =>
-        prevArticles.concat(parsedData.news || [])
-      );
+      setArticles(prevArticles => prevArticles.concat(parsedData.news));
+
+      if (parsedData.news.length < props.pageSize) {
+        setHasMore(false);
+      }
 
     } catch (error) {
       console.error("Fetch more error:", error);
+      setHasMore(false);
     }
   };
 
@@ -96,7 +103,7 @@ const News = (props) => {
       <InfiniteScroll
         dataLength={articles.length}
         next={fetchMoreData}
-        hasMore={articles.length < totalResults}
+        hasMore={hasMore}
         loader={<Spinner />}
       >
         <div className="container">
@@ -123,17 +130,15 @@ const News = (props) => {
   );
 };
 
-// Default props
 News.defaultProps = {
-  pageSize: 8,
+  pageSize: 5,
   category: 'general'
 };
 
-// Prop types
 News.propTypes = {
   pageSize: PropTypes.number,
   category: PropTypes.string,
-  apiKey: PropTypes.string.isRequired,
+  apiKey: PropTypes.string,
   setProgress: PropTypes.func.isRequired
 };
 
