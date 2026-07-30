@@ -10,7 +10,7 @@ const News = (props) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Fallback API key in case props.apiKey is undefined
+  // Fallback API Key
   const apiKey = props.apiKey || "TDDGMkRXv8t88n4c0X3ZmQniDxqTiUouD_9eyd3D-ZvrbjCI";
 
   const capitalizeLetter = (string) => {
@@ -19,6 +19,7 @@ const News = (props) => {
 
   useEffect(() => {
     document.title = `${capitalizeLetter(props.category)} - NewsMonkey`;
+    setArticles([]);
     setPage(1);
     setHasMore(true);
     updateNews(1);
@@ -30,14 +31,24 @@ const News = (props) => {
       props.setProgress(10);
       setLoading(true);
 
-      const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
+      // Build URL - standard latest news query
+      let url = `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
       
+      // Only attach category if it's not default/general
+      if (props.category && props.category !== 'general') {
+        url += `&category=${props.category}`;
+      }
+
+      console.log("Fetching Initial:", url);
       props.setProgress(30);
 
       const response = await fetch(url);
       const parsedData = await response.json();
 
-      if (parsedData.status !== "ok" || !parsedData.news || parsedData.news.length === 0) {
+      console.log("API Response Page 1:", parsedData);
+
+      if (parsedData.status !== "ok" || !parsedData.news) {
+        console.error("API returned error or empty response:", parsedData);
         setArticles([]);
         setHasMore(false);
         setLoading(false);
@@ -47,8 +58,8 @@ const News = (props) => {
 
       setPage(pageNumber);
       setArticles(parsedData.news);
-      
-      // If we received fewer items than requested, there are no more pages
+
+      // If less items returned than requested page size, no more pages left
       if (parsedData.news.length < props.pageSize) {
         setHasMore(false);
       }
@@ -57,7 +68,7 @@ const News = (props) => {
       props.setProgress(100);
 
     } catch (error) {
-      console.error("Fetch error:", error);
+      console.error("Fetch initial error:", error);
       setArticles([]);
       setHasMore(false);
       setLoading(false);
@@ -68,13 +79,22 @@ const News = (props) => {
   const fetchMoreData = async () => {
     const nextPage = page + 1;
 
-    const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
+    let url = `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
+
+    if (props.category && props.category !== 'general') {
+      url += `&category=${props.category}`;
+    }
+
+    console.log("Fetching Page:", nextPage, url);
 
     try {
       const response = await fetch(url);
       const parsedData = await response.json();
 
+      console.log(`API Response Page ${nextPage}:`, parsedData);
+
       if (parsedData.status !== "ok" || !parsedData.news || parsedData.news.length === 0) {
+        console.warn("No more news available.");
         setHasMore(false);
         return;
       }
@@ -110,16 +130,16 @@ const News = (props) => {
           <div className="row">
             {articles
               .filter(article => article && article.title)
-              .map((element) => (
-                <div className="col-md-4" key={element.id || element.url}>
+              .map((element, index) => (
+                <div className="col-md-4" key={`${element.id || element.url}-${index}`}>
                   <NewsItem
-                    title={element.title?.slice(0, 45)}
-                    description={element.description?.slice(0, 88)}
+                    title={element.title ? element.title.slice(0, 45) : ""}
+                    description={element.description ? element.description.slice(0, 88) : ""}
                     imageUrl={element.image}
                     newsUrl={element.url}
                     author={element.author || "Unknown"}
                     date={element.published}
-                    source={element.category?.join(", ") || "News"}
+                    source={element.category ? element.category.join(", ") : "News"}
                   />
                 </div>
               ))}
@@ -131,7 +151,7 @@ const News = (props) => {
 };
 
 News.defaultProps = {
-  pageSize: 5,
+  pageSize: 15,
   category: 'general'
 };
 
