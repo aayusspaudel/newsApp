@@ -14,7 +14,6 @@ const News = (props) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
   };
 
-  // Update document title and fetch news on category change
   useEffect(() => {
     document.title = `${capitalizeLetter(props.category)} - NewsMonkey`;
     setPage(1);
@@ -24,10 +23,11 @@ const News = (props) => {
 
   const updateNews = async (pageNumber = 1) => {
     try {
-      props.setProgress(0);
+      props.setProgress(10);
       setLoading(true);
 
-      const url = `https://newsapi.org/v2/top-headlines?country=${props.country}&category=${props.category}&apiKey=${props.apiKey}&page=${pageNumber}&pageSize=${props.pageSize}`;
+      // Currents API endpoint syntax fix
+      const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${props.apiKey}&page_number=${pageNumber}&page_size=${props.pageSize}`;
       console.log("Fetching URL:", url);
 
       props.setProgress(30);
@@ -37,26 +37,25 @@ const News = (props) => {
 
       console.log("Parsed data:", parsedData);
 
-      // Check API status
       if (parsedData.status !== "ok") {
-        console.error("News API returned error:", parsedData);
+        console.error("Currents API error:", parsedData);
         setArticles([]);
-        setTotalResults(0);
         setLoading(false);
         props.setProgress(100);
         return;
       }
 
       setPage(pageNumber);
-      setArticles(parsedData.articles || []);
-      setTotalResults(parsedData.totalResults || 0);
+      // Currents API returns array in 'news' field
+      setArticles(parsedData.news || []);
+      // Approximate total results based on items returned
+      setTotalResults(parsedData.news ? parsedData.news.length : 0);
       setLoading(false);
       props.setProgress(100);
 
     } catch (error) {
       console.error("Fetch error:", error);
       setArticles([]);
-      setTotalResults(0);
       setLoading(false);
       props.setProgress(100);
     }
@@ -65,23 +64,21 @@ const News = (props) => {
   const fetchMoreData = async () => {
     const nextPage = page + 1;
 
-    const url = `https://newsapi.org/v2/top-headlines?country=${props.country}&category=${props.category}&apiKey=${props.apiKey}&page=${nextPage}&pageSize=${props.pageSize}`;
-    console.log("Fetching more:", url);
+    const url = `https://api.currentsapi.services/v1/latest-news?language=en&category=${props.category}&apiKey=${props.apiKey}&page_number=${nextPage}&page_size=${props.pageSize}`;
 
     try {
       const response = await fetch(url);
       const parsedData = await response.json();
 
       if (parsedData.status !== "ok") {
-        console.error("News API returned error on fetchMore:", parsedData);
+        console.error("Currents API fetchMore error:", parsedData);
         return;
       }
 
       setPage(nextPage);
       setArticles(prevArticles =>
-        prevArticles.concat(parsedData.articles || [])
+        prevArticles.concat(parsedData.news || [])
       );
-      setTotalResults(parsedData.totalResults || 0);
 
     } catch (error) {
       console.error("Fetch more error:", error);
@@ -107,15 +104,15 @@ const News = (props) => {
             {articles
               .filter(article => article && article.title)
               .map((element) => (
-                <div className="col-md-4" key={element.url}>
+                <div className="col-md-4" key={element.id || element.url}>
                   <NewsItem
                     title={element.title?.slice(0, 45)}
                     description={element.description?.slice(0, 88)}
-                    imageUrl={element.urlToImage}
+                    imageUrl={element.image}
                     newsUrl={element.url}
                     author={element.author || "Unknown"}
-                    date={element.publishedAt}
-                    source={element.source?.name || "Unknown"}
+                    date={element.published}
+                    source={element.category?.join(", ") || "News"}
                   />
                 </div>
               ))}
@@ -128,14 +125,12 @@ const News = (props) => {
 
 // Default props
 News.defaultProps = {
-  country: 'us',
   pageSize: 8,
   category: 'general'
 };
 
 // Prop types
 News.propTypes = {
-  country: PropTypes.string,
   pageSize: PropTypes.number,
   category: PropTypes.string,
   apiKey: PropTypes.string.isRequired,
