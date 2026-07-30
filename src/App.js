@@ -12,7 +12,7 @@ import {
 
 const App = () => {
 
-  const apiKey = process.env.REACT_APP_NEWS_API;
+const apiKey = process.env.REACT_APP_CURRENTS_API_KEY;
 
   const [progress, setProgress] = useState(0);
 
