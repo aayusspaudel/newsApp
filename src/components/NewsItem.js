@@ -19,7 +19,7 @@ import React from 'react'
           >
             <span
               className="p-2 border border-light"
-              style={{ backgroundColor: 'lightgreen', borderRadius: '10px'}}
+              style={{ backgroundColor: 'lightgreen', borderRadius: '7px'}}
             >
               {source}
             </span>
